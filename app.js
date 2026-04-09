@@ -231,6 +231,17 @@ async function loadBalances() {
 
 // ===== Helpers =============================================================
 
+async function waitForConfirmation(statusEl, successMsg) {
+  showStatus(statusEl, 'Transaction submitted. Waiting for confirmation...', '');
+  for (let i = 0; i < 10; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    showStatus(statusEl, `Confirming... (${i + 1}/10)`, '');
+  }
+  showStatus(statusEl, successMsg, 'success');
+  loadPoolData();
+  loadBalances();
+}
+
 function showStatus(elId, msg, type) {
   const el = document.getElementById(elId);
   el.textContent = msg;
@@ -368,10 +379,9 @@ document.getElementById('swap-btn').addEventListener('click', async () => {
         ]
       });
     }
-    showStatus('swap-status', 'Swap successful!', 'success');
     document.getElementById('swap-input').value = '';
     document.getElementById('swap-output').value = '';
-    setTimeout(() => { loadPoolData(); loadBalances(); }, 4000);
+    await waitForConfirmation('swap-status', 'Swap confirmed!');
   } catch (e) {
     showStatus('swap-status', e.message, 'error');
   }
@@ -403,10 +413,9 @@ document.getElementById('liq-add-btn').addEventListener('click', async () => {
         { type: 'call', target: dexBase58, method: 'add_liquidity', args: addLiqArgs },
       ]
     });
-    showStatus('liq-status', 'Liquidity added!', 'success');
     document.getElementById('liq-solen').value = '';
     document.getElementById('liq-stt').value = '';
-    setTimeout(() => { loadPoolData(); loadBalances(); }, 4000);
+    await waitForConfirmation('liq-status', 'Liquidity added!');
   } catch (e) {
     showStatus('liq-status', e.message, 'error');
   }
@@ -433,9 +442,8 @@ document.getElementById('liq-remove-btn').addEventListener('click', async () => 
         { type: 'call', target: dexBase58, method: 'withdraw_stt', args: u128ToLeHex(sttOut) },
       ]
     });
-    showStatus('liq-status', 'Liquidity removed! Tokens returned to wallet.', 'success');
     document.getElementById('liq-remove').value = '';
-    setTimeout(() => { loadPoolData(); loadBalances(); }, 4000);
+    await waitForConfirmation('liq-status', 'Liquidity removed! Tokens returned to wallet.');
   } catch (e) {
     showStatus('liq-status', e.message, 'error');
   }
