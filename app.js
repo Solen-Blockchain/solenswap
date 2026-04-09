@@ -196,46 +196,36 @@ async function loadPoolData() {
 
 // ===== User Balances =======================================================
 
+let walletSolen = 0n;
+let walletStt = 0n;
+let userLp = 0n;
+
 async function loadBalances() {
   if (!wallet) return;
 
   try {
     const acct = await rpc('solen_getAccount', [wallet.accountBase58]);
     if (acct) {
-      const bal = BigInt(acct.balance || '0');
-      document.getElementById('w-solen').textContent = formatAmount(bal) + ' SOLEN';
-      document.getElementById('dep-wallet-solen').textContent = formatAmount(bal);
+      walletSolen = BigInt(acct.balance || '0');
+      document.getElementById('w-solen').textContent = formatAmount(walletSolen) + ' SOLEN';
+      document.getElementById('liq-solen-bal').textContent = formatAmount(walletSolen);
+      if (swapDirection === 0) document.getElementById('swap-balance').textContent = formatAmount(walletSolen) + ' SOLEN';
     }
   } catch {}
 
   try {
-    const hex = await callView(CONFIG.dexContract, 'balance_solen', wallet.accountHex);
-    const bal = leHexToU128(hex);
-    document.getElementById('w-dex-solen').textContent = formatAmount(bal) + ' SOLEN';
-    document.getElementById('wd-dex-solen').textContent = formatAmount(bal);
-    document.getElementById('liq-solen-bal').textContent = formatAmount(bal);
-    if (swapDirection === 0) document.getElementById('swap-balance').textContent = formatAmount(bal) + ' SOLEN';
-  } catch {}
-
-  try {
-    const hex = await callView(CONFIG.dexContract, 'balance_stt', wallet.accountHex);
-    const bal = leHexToU128(hex);
-    document.getElementById('w-dex-stt').textContent = formatAmount(bal) + ' STT';
-    document.getElementById('liq-stt-bal').textContent = formatAmount(bal);
-    if (swapDirection === 1) document.getElementById('swap-balance').textContent = formatAmount(bal) + ' STT';
+    const hex = await callView(CONFIG.sttContract, 'balance_of', wallet.accountHex);
+    walletStt = leHexToU128(hex);
+    document.getElementById('w-stt').textContent = formatAmount(walletStt) + ' STT';
+    document.getElementById('liq-stt-bal').textContent = formatAmount(walletStt);
+    if (swapDirection === 1) document.getElementById('swap-balance').textContent = formatAmount(walletStt) + ' STT';
   } catch {}
 
   try {
     const hex = await callView(CONFIG.dexContract, 'balance_lp', wallet.accountHex);
-    const bal = leHexToU128(hex);
-    document.getElementById('w-lp').textContent = formatAmount(bal);
-    document.getElementById('liq-lp-bal').textContent = formatAmount(bal);
-  } catch {}
-
-  try {
-    const hex = await callView(CONFIG.sttContract, 'balance_of', wallet.accountHex);
-    const bal = leHexToU128(hex);
-    document.getElementById('dep-wallet-stt').textContent = formatAmount(bal);
+    userLp = leHexToU128(hex);
+    document.getElementById('w-lp').textContent = formatAmount(userLp);
+    document.getElementById('liq-lp-bal').textContent = formatAmount(userLp);
   } catch {}
 }
 
@@ -352,96 +342,41 @@ document.getElementById('swap-btn').addEventListener('click', async () => {
   const amountIn = parseAmount(document.getElementById('swap-input').value);
   if (amountIn === 0n) return;
 
-  const method = swapDirection === 0 ? 'swap_solen_for_stt' : 'swap_stt_for_solen';
-  const argsHex = u128ToLeHex(amountIn);
-
   const dexBase58 = hexToBase58(CONFIG.dexContract);
+  const amountStr = (Number(amountIn) / BASE).toString();
+  const amountHex = u128ToLeHex(amountIn);
+
   showStatus('swap-status', 'Signing transaction...', '');
   try {
-    await wallet.provider.signAndSubmit({
-      to: dexBase58, method, args: argsHex,
-    });
-    showStatus('swap-status', 'Swap submitted! Waiting for confirmation...', 'success');
+    if (swapDirection === 0) {
+      // SOLEN -> STT: Transfer SOLEN to DEX + deposit + swap (output stays in DEX balance)
+      await wallet.provider.signAndSubmit({
+        actions: [
+          { type: 'transfer', to: dexBase58, amount: amountStr },
+          { type: 'call', target: dexBase58, method: 'deposit_solen', args: amountHex },
+          { type: 'call', target: dexBase58, method: 'swap_solen_for_stt', args: amountHex },
+        ]
+      });
+    } else {
+      // STT -> SOLEN: Transfer STT via token contract + deposit + swap
+      const transferArgs = CONFIG.dexContract + amountHex;
+      await wallet.provider.signAndSubmit({
+        actions: [
+          { type: 'call', target: CONFIG.sttContract, method: 'transfer', args: transferArgs },
+          { type: 'call', target: dexBase58, method: 'deposit_stt', args: amountHex },
+          { type: 'call', target: dexBase58, method: 'swap_stt_for_solen', args: amountHex },
+        ]
+      });
+    }
+    showStatus('swap-status', 'Swap successful!', 'success');
+    document.getElementById('swap-input').value = '';
+    document.getElementById('swap-output').value = '';
     setTimeout(() => { loadPoolData(); loadBalances(); }, 4000);
   } catch (e) {
     showStatus('swap-status', e.message, 'error');
   }
 });
 
-// ===== Deposit Actions =====================================================
-
-document.getElementById('dep-solen-btn').addEventListener('click', async () => {
-  if (!wallet) return;
-  const amount = parseAmount(document.getElementById('dep-solen').value);
-  if (amount === 0n) return;
-
-  const dexBase58 = hexToBase58(CONFIG.dexContract);
-  const solenStr = (Number(amount) / BASE).toString();
-
-  showStatus('dep-status', 'Signing deposit...', '');
-  try {
-    // Two actions: Transfer SOLEN to DEX, then call deposit_solen
-    await wallet.provider.signAndSubmit({
-      actions: [
-        { type: 'transfer', to: dexBase58, amount: solenStr },
-        { type: 'call', target: dexBase58, method: 'deposit_solen', args: u128ToLeHex(amount) },
-      ]
-    });
-    showStatus('dep-status', 'SOLEN deposit submitted!', 'success');
-    document.getElementById('dep-solen').value = '';
-    setTimeout(() => { loadPoolData(); loadBalances(); }, 4000);
-  } catch (e) {
-    showStatus('dep-status', e.message, 'error');
-  }
-});
-
-document.getElementById('dep-stt-btn').addEventListener('click', async () => {
-  if (!wallet) return;
-  const amount = parseAmount(document.getElementById('dep-stt').value);
-  if (amount === 0n) return;
-
-  const dexBase58 = hexToBase58(CONFIG.dexContract);
-  const sttBase58 = CONFIG.sttContract;
-
-  showStatus('dep-status', 'Signing STT deposit...', '');
-  try {
-    // Two actions: Transfer STT via token contract, then call deposit_stt
-    const transferArgs = CONFIG.dexContract + u128ToLeHex(amount); // to[32] + amount[16]
-    await wallet.provider.signAndSubmit({
-      actions: [
-        { type: 'call', target: sttBase58, method: 'transfer', args: transferArgs },
-        { type: 'call', target: dexBase58, method: 'deposit_stt', args: u128ToLeHex(amount) },
-      ]
-    });
-    showStatus('dep-status', 'STT deposit submitted!', 'success');
-    document.getElementById('dep-stt').value = '';
-    setTimeout(() => { loadPoolData(); loadBalances(); }, 4000);
-  } catch (e) {
-    showStatus('dep-status', e.message, 'error');
-  }
-});
-
-// ===== Withdraw Actions ====================================================
-
-document.getElementById('wd-solen-btn').addEventListener('click', async () => {
-  if (!wallet) return;
-  const amount = parseAmount(document.getElementById('wd-solen').value);
-  if (amount === 0n) return;
-
-  const dexBase58 = hexToBase58(CONFIG.dexContract);
-
-  showStatus('dep-status', 'Signing withdrawal...', '');
-  try {
-    await wallet.provider.signAndSubmit({
-      to: dexBase58, method: 'withdraw_solen', args: u128ToLeHex(amount),
-    });
-    showStatus('dep-status', 'Withdrawal submitted!', 'success');
-    document.getElementById('wd-solen').value = '';
-    setTimeout(() => { loadPoolData(); loadBalances(); }, 4000);
-  } catch (e) {
-    showStatus('dep-status', e.message, 'error');
-  }
-});
 
 // ===== Liquidity Actions ===================================================
 
@@ -452,12 +387,21 @@ document.getElementById('liq-add-btn').addEventListener('click', async () => {
   if (solenAmt === 0n || sttAmt === 0n) return;
 
   const dexBase58 = hexToBase58(CONFIG.dexContract);
-  const argsHex = u128ToLeHex(solenAmt) + u128ToLeHex(sttAmt);
+  const solenStr = (Number(solenAmt) / BASE).toString();
+  const sttTransferArgs = CONFIG.dexContract + u128ToLeHex(sttAmt);
+  const addLiqArgs = u128ToLeHex(solenAmt) + u128ToLeHex(sttAmt);
 
   showStatus('liq-status', 'Signing add liquidity...', '');
   try {
+    // Atomic: Transfer SOLEN + Transfer STT + deposit both + add liquidity
     await wallet.provider.signAndSubmit({
-      to: dexBase58, method: 'add_liquidity', args: argsHex,
+      actions: [
+        { type: 'transfer', to: dexBase58, amount: solenStr },
+        { type: 'call', target: CONFIG.sttContract, method: 'transfer', args: sttTransferArgs },
+        { type: 'call', target: dexBase58, method: 'deposit_solen', args: u128ToLeHex(solenAmt) },
+        { type: 'call', target: dexBase58, method: 'deposit_stt', args: u128ToLeHex(sttAmt) },
+        { type: 'call', target: dexBase58, method: 'add_liquidity', args: addLiqArgs },
+      ]
     });
     showStatus('liq-status', 'Liquidity added!', 'success');
     document.getElementById('liq-solen').value = '';
@@ -477,10 +421,14 @@ document.getElementById('liq-remove-btn').addEventListener('click', async () => 
 
   showStatus('liq-status', 'Signing remove liquidity...', '');
   try {
+    // Remove liquidity — returns tokens to DEX internal balance.
+    // Then withdraw both back to wallet.
     await wallet.provider.signAndSubmit({
-      to: dexBase58, method: 'remove_liquidity', args: u128ToLeHex(lpAmt),
+      actions: [
+        { type: 'call', target: dexBase58, method: 'remove_liquidity', args: u128ToLeHex(lpAmt) },
+      ]
     });
-    showStatus('liq-status', 'Liquidity removed!', 'success');
+    showStatus('liq-status', 'Liquidity removed! Tokens returned to DEX balance.', 'success');
     document.getElementById('liq-remove').value = '';
     setTimeout(() => { loadPoolData(); loadBalances(); }, 4000);
   } catch (e) {
@@ -489,15 +437,6 @@ document.getElementById('liq-remove-btn').addEventListener('click', async () => 
 });
 
 // ===== Input Enable/Disable ================================================
-
-['dep-solen', 'dep-stt', 'wd-solen'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => {
-    const val = parseFloat(document.getElementById(id).value);
-    const btnId = id + '-btn';
-    const btn = document.getElementById(btnId);
-    if (btn) btn.disabled = !wallet || !val || val <= 0;
-  });
-});
 
 ['liq-solen', 'liq-stt'].forEach(id => {
   document.getElementById(id).addEventListener('input', () => {

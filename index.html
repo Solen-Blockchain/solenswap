@@ -54,7 +54,6 @@
     <div class="tabs">
       <button class="tab active" data-tab="swap">Swap</button>
       <button class="tab" data-tab="liquidity">Liquidity</button>
-      <button class="tab" data-tab="deposit">Deposit / Withdraw</button>
     </div>
 
     <!-- Swap Panel -->
@@ -101,7 +100,7 @@
         </div>
 
         <div class="balances">
-          <span>Your DEX balance: <strong id="swap-balance">--</strong></span>
+          <span>Wallet balance: <strong id="swap-balance">--</strong></span>
         </div>
 
         <button class="btn btn-primary btn-full" id="swap-btn" disabled>Enter an amount</button>
@@ -121,7 +120,7 @@
             <input type="number" id="liq-solen" placeholder="0.00" min="0" step="any">
             <span class="input-token">SOLEN</span>
           </div>
-          <div class="input-hint">DEX balance: <span id="liq-solen-bal">--</span></div>
+          <div class="input-hint">Wallet: <span id="liq-solen-bal">--</span></div>
         </div>
 
         <div class="input-group">
@@ -130,7 +129,7 @@
             <input type="number" id="liq-stt" placeholder="0.00" min="0" step="any">
             <span class="input-token">STT</span>
           </div>
-          <div class="input-hint">DEX balance: <span id="liq-stt-bal">--</span></div>
+          <div class="input-hint">Wallet: <span id="liq-stt-bal">--</span></div>
         </div>
 
         <button class="btn btn-primary btn-full" id="liq-add-btn" disabled>Add Liquidity</button>
@@ -152,51 +151,6 @@
       </div>
     </div>
 
-    <!-- Deposit/Withdraw Panel -->
-    <div class="panel hidden" id="panel-deposit">
-      <div class="swap-card">
-        <h3>Deposit into DEX</h3>
-        <p class="panel-desc">Transfer tokens from your wallet to the DEX for trading.</p>
-
-        <div class="input-group">
-          <label>Deposit SOLEN</label>
-          <div class="input-wrap">
-            <input type="number" id="dep-solen" placeholder="0.00" min="0" step="any">
-            <span class="input-token">SOLEN</span>
-          </div>
-          <div class="input-hint">Wallet balance: <span id="dep-wallet-solen">--</span></div>
-        </div>
-        <button class="btn btn-primary btn-full" id="dep-solen-btn" disabled>Deposit SOLEN</button>
-
-        <div class="divider"></div>
-
-        <div class="input-group">
-          <label>Deposit STT</label>
-          <div class="input-wrap">
-            <input type="number" id="dep-stt" placeholder="0.00" min="0" step="any">
-            <span class="input-token">STT</span>
-          </div>
-          <div class="input-hint">STT balance: <span id="dep-wallet-stt">--</span></div>
-        </div>
-        <button class="btn btn-primary btn-full" id="dep-stt-btn" disabled>Deposit STT</button>
-
-        <div class="divider"></div>
-
-        <h3>Withdraw from DEX</h3>
-
-        <div class="input-group">
-          <label>Withdraw SOLEN</label>
-          <div class="input-wrap">
-            <input type="number" id="wd-solen" placeholder="0.00" min="0" step="any">
-            <span class="input-token">SOLEN</span>
-          </div>
-          <div class="input-hint">DEX balance: <span id="wd-dex-solen">--</span></div>
-        </div>
-        <button class="btn btn-outline btn-full" id="wd-solen-btn" disabled>Withdraw SOLEN</button>
-
-        <div class="status" id="dep-status"></div>
-      </div>
-    </div>
 
     <!-- Wallet Section -->
     <div class="wallet-card">
@@ -212,9 +166,8 @@
           <button class="wallet-disconnect" id="wallet-disconnect-btn">Disconnect</button>
         </div>
         <div class="wallet-balances">
-          <div class="wallet-bal"><span>Wallet SOLEN:</span> <strong id="w-solen">--</strong></div>
-          <div class="wallet-bal"><span>DEX SOLEN:</span> <strong id="w-dex-solen">--</strong></div>
-          <div class="wallet-bal"><span>DEX STT:</span> <strong id="w-dex-stt">--</strong></div>
+          <div class="wallet-bal"><span>SOLEN:</span> <strong id="w-solen">--</strong></div>
+          <div class="wallet-bal"><span>STT:</span> <strong id="w-stt">--</strong></div>
           <div class="wallet-bal"><span>LP Shares:</span> <strong id="w-lp">--</strong></div>
         </div>
       </div>
