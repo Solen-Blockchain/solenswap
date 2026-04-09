@@ -1,0 +1,7 @@
+.gitconfig
+/target/
+/data/
+*.swp
+*.swo
+*~
+.env

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SolenSwap — STT/SOLEN Trading</title>
+  <meta name="description" content="Decentralized exchange for trading STT/SOLEN on the Solen blockchain. Automated market maker with 0.3% swap fee.">
+  <link rel="icon" type="image/png" sizes="32x32" href="https://solenchain.io/favicon-32.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <img src="https://solenchain.io/solenlogo.png" alt="Solen" class="nav-logo-img">
+        <span>SolenSwap</span>
+      </a>
+      <div class="nav-links">
+        <a href="https://solenchain.io" target="_blank">Solen</a>
+        <a href="https://solenscan.io" target="_blank">Explorer</a>
+        <a href="https://docs.solenchain.io" target="_blank">Docs</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <!-- Pool Info -->
+    <div class="pool-card">
+      <div class="pool-header">
+        <h2>STT / SOLEN Pool</h2>
+        <span class="pool-fee">0.3% fee</span>
+      </div>
+      <div class="pool-stats">
+        <div class="stat">
+          <span class="stat-label">SOLEN Reserve</span>
+          <span class="stat-value" id="reserve-solen">--</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">STT Reserve</span>
+          <span class="stat-value" id="reserve-stt">--</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Price</span>
+          <span class="stat-value" id="price">--</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Total LP Shares</span>
+          <span class="stat-value" id="total-lp">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="swap">Swap</button>
+      <button class="tab" data-tab="liquidity">Liquidity</button>
+      <button class="tab" data-tab="deposit">Deposit / Withdraw</button>
+    </div>
+
+    <!-- Swap Panel -->
+    <div class="panel" id="panel-swap">
+      <div class="swap-card">
+        <div class="swap-direction">
+          <button class="direction-btn active" id="dir-solen-stt">SOLEN &rarr; STT</button>
+          <button class="direction-btn" id="dir-stt-solen">STT &rarr; SOLEN</button>
+        </div>
+
+        <div class="input-group">
+          <label>You pay</label>
+          <div class="input-wrap">
+            <input type="number" id="swap-input" placeholder="0.00" min="0" step="any">
+            <span class="input-token" id="swap-input-token">SOLEN</span>
+          </div>
+        </div>
+
+        <div class="swap-arrow">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14m0 0l-4-4m4 4l4-4"/></svg>
+        </div>
+
+        <div class="input-group">
+          <label>You receive (estimated)</label>
+          <div class="input-wrap">
+            <input type="text" id="swap-output" placeholder="0.00" readonly>
+            <span class="input-token" id="swap-output-token">STT</span>
+          </div>
+        </div>
+
+        <div class="swap-info">
+          <div class="info-row">
+            <span>Rate</span>
+            <span id="swap-rate">--</span>
+          </div>
+          <div class="info-row">
+            <span>Price Impact</span>
+            <span id="swap-impact">--</span>
+          </div>
+          <div class="info-row">
+            <span>Fee (0.3%)</span>
+            <span id="swap-fee">--</span>
+          </div>
+        </div>
+
+        <div class="balances">
+          <span>Your DEX balance: <strong id="swap-balance">--</strong></span>
+        </div>
+
+        <button class="btn btn-primary btn-full" id="swap-btn" disabled>Enter an amount</button>
+        <div class="status" id="swap-status"></div>
+      </div>
+    </div>
+
+    <!-- Liquidity Panel -->
+    <div class="panel hidden" id="panel-liquidity">
+      <div class="swap-card">
+        <h3>Add Liquidity</h3>
+        <p class="panel-desc">Provide both SOLEN and STT to earn 0.3% on every trade.</p>
+
+        <div class="input-group">
+          <label>SOLEN Amount</label>
+          <div class="input-wrap">
+            <input type="number" id="liq-solen" placeholder="0.00" min="0" step="any">
+            <span class="input-token">SOLEN</span>
+          </div>
+          <div class="input-hint">DEX balance: <span id="liq-solen-bal">--</span></div>
+        </div>
+
+        <div class="input-group">
+          <label>STT Amount</label>
+          <div class="input-wrap">
+            <input type="number" id="liq-stt" placeholder="0.00" min="0" step="any">
+            <span class="input-token">STT</span>
+          </div>
+          <div class="input-hint">DEX balance: <span id="liq-stt-bal">--</span></div>
+        </div>
+
+        <button class="btn btn-primary btn-full" id="liq-add-btn" disabled>Add Liquidity</button>
+
+        <div class="divider"></div>
+
+        <h3>Remove Liquidity</h3>
+        <div class="input-group">
+          <label>LP Shares to Burn</label>
+          <div class="input-wrap">
+            <input type="number" id="liq-remove" placeholder="0.00" min="0" step="any">
+            <span class="input-token">LP</span>
+          </div>
+          <div class="input-hint">Your LP shares: <span id="liq-lp-bal">--</span></div>
+        </div>
+
+        <button class="btn btn-outline btn-full" id="liq-remove-btn" disabled>Remove Liquidity</button>
+        <div class="status" id="liq-status"></div>
+      </div>
+    </div>
+
+    <!-- Deposit/Withdraw Panel -->
+    <div class="panel hidden" id="panel-deposit">
+      <div class="swap-card">
+        <h3>Deposit into DEX</h3>
+        <p class="panel-desc">Transfer tokens from your wallet to the DEX for trading.</p>
+
+        <div class="input-group">
+          <label>Deposit SOLEN</label>
+          <div class="input-wrap">
+            <input type="number" id="dep-solen" placeholder="0.00" min="0" step="any">
+            <span class="input-token">SOLEN</span>
+          </div>
+          <div class="input-hint">Wallet balance: <span id="dep-wallet-solen">--</span></div>
+        </div>
+        <button class="btn btn-primary btn-full" id="dep-solen-btn" disabled>Deposit SOLEN</button>
+
+        <div class="divider"></div>
+
+        <div class="input-group">
+          <label>Deposit STT</label>
+          <div class="input-wrap">
+            <input type="number" id="dep-stt" placeholder="0.00" min="0" step="any">
+            <span class="input-token">STT</span>
+          </div>
+          <div class="input-hint">STT balance: <span id="dep-wallet-stt">--</span></div>
+        </div>
+        <button class="btn btn-primary btn-full" id="dep-stt-btn" disabled>Deposit STT</button>
+
+        <div class="divider"></div>
+
+        <h3>Withdraw from DEX</h3>
+
+        <div class="input-group">
+          <label>Withdraw SOLEN</label>
+          <div class="input-wrap">
+            <input type="number" id="wd-solen" placeholder="0.00" min="0" step="any">
+            <span class="input-token">SOLEN</span>
+          </div>
+          <div class="input-hint">DEX balance: <span id="wd-dex-solen">--</span></div>
+        </div>
+        <button class="btn btn-outline btn-full" id="wd-solen-btn" disabled>Withdraw SOLEN</button>
+
+        <div class="status" id="dep-status"></div>
+      </div>
+    </div>
+
+    <!-- Wallet Section -->
+    <div class="wallet-card">
+      <div id="wallet-disconnected">
+        <p>Connect your Solen wallet to trade.</p>
+        <button class="btn btn-primary" id="wallet-connect-btn">Connect Wallet</button>
+        <p class="wallet-hint">Requires the <a href="https://solenchain.io" target="_blank">Solen Browser Extension</a></p>
+      </div>
+      <div id="wallet-connected" class="hidden">
+        <div class="wallet-info">
+          <span class="wallet-dot"></span>
+          <span id="wallet-addr">--</span>
+          <button class="wallet-disconnect" id="wallet-disconnect-btn">Disconnect</button>
+        </div>
+        <div class="wallet-balances">
+          <div class="wallet-bal"><span>Wallet SOLEN:</span> <strong id="w-solen">--</strong></div>
+          <div class="wallet-bal"><span>DEX SOLEN:</span> <strong id="w-dex-solen">--</strong></div>
+          <div class="wallet-bal"><span>DEX STT:</span> <strong id="w-dex-stt">--</strong></div>
+          <div class="wallet-bal"><span>LP Shares:</span> <strong id="w-lp">--</strong></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>SolenSwap &mdash; Decentralized Exchange on Solen</span>
+      <div class="footer-links">
+        <a href="https://solenchain.io">Solen</a>
+        <a href="https://solenscan.io">Explorer</a>
+        <a href="https://docs.solenchain.io">Docs</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
