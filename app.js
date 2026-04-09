@@ -251,6 +251,18 @@ async function waitForConfirmation(statusEl, successMsg) {
   showStatus(statusEl, 'Transaction may have failed. Check the explorer.', 'error');
 }
 
+async function signAndSubmitWithTimeout(params, timeoutMs = 30000) {
+  if (!wallet || !wallet.provider) throw new Error('Wallet not connected');
+  const result = await Promise.race([
+    wallet.provider.signAndSubmit(params),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Signature request timed out. Try again.')), timeoutMs)),
+  ]);
+  if (result && typeof result === 'object' && 'error' in result && result.error) {
+    throw new Error(result.error);
+  }
+  return result;
+}
+
 function showStatus(elId, msg, type) {
   const el = document.getElementById(elId);
   el.textContent = msg;
@@ -370,7 +382,7 @@ document.getElementById('swap-btn').addEventListener('click', async () => {
   try {
     if (swapDirection === 0) {
       // SOLEN -> STT: Transfer + deposit + swap + withdraw STT to wallet
-      await wallet.provider.signAndSubmit({
+      await signAndSubmitWithTimeout({
         actions: [
           { type: 'transfer', to: dexBase58, amount: amountStr },
           { type: 'call', target: dexBase58, method: 'deposit_solen', args: amountHex },
@@ -381,7 +393,7 @@ document.getElementById('swap-btn').addEventListener('click', async () => {
     } else {
       // STT -> SOLEN: Transfer STT + deposit + swap + withdraw SOLEN to wallet
       const transferArgs = CONFIG.dexContract + amountHex;
-      await wallet.provider.signAndSubmit({
+      await signAndSubmitWithTimeout({
         actions: [
           { type: 'call', target: CONFIG.sttContract, method: 'transfer', args: transferArgs },
           { type: 'call', target: dexBase58, method: 'deposit_stt', args: amountHex },
@@ -415,7 +427,7 @@ document.getElementById('liq-add-btn').addEventListener('click', async () => {
   showStatus('liq-status', 'Signing add liquidity...', '');
   try {
     // Atomic: Transfer SOLEN + Transfer STT + deposit both + add liquidity
-    await wallet.provider.signAndSubmit({
+    await signAndSubmitWithTimeout({
       actions: [
         { type: 'transfer', to: dexBase58, amount: solenStr },
         { type: 'call', target: CONFIG.sttContract, method: 'transfer', args: sttTransferArgs },
@@ -446,7 +458,7 @@ document.getElementById('liq-remove-btn').addEventListener('click', async () => 
   showStatus('liq-status', 'Signing remove liquidity...', '');
   try {
     // Atomic: remove liquidity + withdraw all tokens back to wallet.
-    await wallet.provider.signAndSubmit({
+    await signAndSubmitWithTimeout({
       actions: [
         { type: 'call', target: dexBase58, method: 'remove_liquidity', args: u128ToLeHex(lpAmt) },
         { type: 'call', target: dexBase58, method: 'withdraw_all_solen', args: '' },
