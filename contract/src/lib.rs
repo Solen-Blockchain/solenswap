@@ -346,30 +346,37 @@ fn do_add_liquidity(args: &[u8]) -> i32 {
     let reserve_stt = get_u128(b"reserve_stt");
     let total_lp = get_u128(b"total_lp");
 
-    // Calculate LP tokens to mint.
-    let lp_minted = if total_lp == 0 {
+    // Calculate LP tokens to mint and actual amounts used.
+    let (lp_minted, actual_solen, actual_stt) = if total_lp == 0 {
         // First liquidity provision — LP = sqrt(solen * stt).
         let product = solen_amount.saturating_mul(stt_amount);
         let lp = isqrt(product);
         if lp == 0 { return sdk::return_value(b"err:liquidity_too_small"); }
-        lp
+        (lp, solen_amount, stt_amount)
     } else {
-        // Proportional to existing reserves.
+        // Proportional to existing reserves. Only use what maintains the ratio.
         let lp_from_solen = solen_amount.saturating_mul(total_lp) / reserve_solen;
         let lp_from_stt = stt_amount.saturating_mul(total_lp) / reserve_stt;
-        // Use the smaller to maintain ratio.
-        if lp_from_solen < lp_from_stt { lp_from_solen } else { lp_from_stt }
+        if lp_from_solen < lp_from_stt {
+            // SOLEN is the limiting factor — scale STT down.
+            let used_stt = lp_from_solen.saturating_mul(reserve_stt) / total_lp;
+            (lp_from_solen, solen_amount, used_stt)
+        } else {
+            // STT is the limiting factor — scale SOLEN down.
+            let used_solen = lp_from_stt.saturating_mul(reserve_solen) / total_lp;
+            (lp_from_stt, used_solen, stt_amount)
+        }
     };
 
     if lp_minted == 0 {
         return sdk::return_value(b"err:insufficient_liquidity");
     }
 
-    // Debit user, credit pool.
-    set_u128(&solen_key, user_solen - solen_amount);
-    set_u128(&stt_key, user_stt - stt_amount);
-    set_u128(b"reserve_solen", reserve_solen.saturating_add(solen_amount));
-    set_u128(b"reserve_stt", reserve_stt.saturating_add(stt_amount));
+    // Debit only the amounts actually used. Excess stays in user's DEX balance.
+    set_u128(&solen_key, user_solen - actual_solen);
+    set_u128(&stt_key, user_stt - actual_stt);
+    set_u128(b"reserve_solen", reserve_solen.saturating_add(actual_solen));
+    set_u128(b"reserve_stt", reserve_stt.saturating_add(actual_stt));
     set_u128(b"total_lp", total_lp.saturating_add(lp_minted));
 
     let lp_k = lp_key(&caller);
@@ -377,8 +384,8 @@ fn do_add_liquidity(args: &[u8]) -> i32 {
     set_u128(&lp_k, user_lp.saturating_add(lp_minted));
 
     let mut event_data = [0u8; 48];
-    event_data[..16].copy_from_slice(&solen_amount.to_le_bytes());
-    event_data[16..32].copy_from_slice(&stt_amount.to_le_bytes());
+    event_data[..16].copy_from_slice(&actual_solen.to_le_bytes());
+    event_data[16..32].copy_from_slice(&actual_stt.to_le_bytes());
     event_data[32..48].copy_from_slice(&lp_minted.to_le_bytes());
     events::emit(b"liquidity_added", &event_data);
     sdk::return_value(&lp_minted.to_le_bytes())

@@ -4,7 +4,7 @@
 const CONFIG = {
   rpc: 'https://testnet-rpc3.solenchain.io',
   chainId: 9000,
-  dexContract: '7ab62cea689710f8e219139aceb7f811b1e488775563d6828aedc5648a492639',
+  dexContract: 'b53a7508701336a8a6b877cd5f5e810169d9122bc0fc6ba6c9d93938c6d32b4a',
   sttContract: 'Dse2ppCqGpFrrUpuKFuXtSVQiBq8mvLF2cU8npQWicmp',
   decimals: 8,
 };
@@ -419,16 +419,21 @@ document.getElementById('liq-remove-btn').addEventListener('click', async () => 
 
   const dexBase58 = hexToBase58(CONFIG.dexContract);
 
+  // Calculate expected SOLEN and STT amounts from removing liquidity.
+  const solenOut = poolData.totalLp > 0n ? (lpAmt * poolData.reserveSolen / poolData.totalLp) : 0n;
+  const sttOut = poolData.totalLp > 0n ? (lpAmt * poolData.reserveStt / poolData.totalLp) : 0n;
+
   showStatus('liq-status', 'Signing remove liquidity...', '');
   try {
-    // Remove liquidity — returns tokens to DEX internal balance.
-    // Then withdraw both back to wallet.
+    // Atomic: remove liquidity + withdraw both tokens back to wallet.
     await wallet.provider.signAndSubmit({
       actions: [
         { type: 'call', target: dexBase58, method: 'remove_liquidity', args: u128ToLeHex(lpAmt) },
+        { type: 'call', target: dexBase58, method: 'withdraw_solen', args: u128ToLeHex(solenOut) },
+        { type: 'call', target: dexBase58, method: 'withdraw_stt', args: u128ToLeHex(sttOut) },
       ]
     });
-    showStatus('liq-status', 'Liquidity removed! Tokens returned to DEX balance.', 'success');
+    showStatus('liq-status', 'Liquidity removed! Tokens returned to wallet.', 'success');
     document.getElementById('liq-remove').value = '';
     setTimeout(() => { loadPoolData(); loadBalances(); }, 4000);
   } catch (e) {
@@ -438,13 +443,37 @@ document.getElementById('liq-remove-btn').addEventListener('click', async () => 
 
 // ===== Input Enable/Disable ================================================
 
-['liq-solen', 'liq-stt'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => {
-    const s = parseFloat(document.getElementById('liq-solen').value);
-    const t = parseFloat(document.getElementById('liq-stt').value);
-    document.getElementById('liq-add-btn').disabled = !wallet || !s || !t || s <= 0 || t <= 0;
-  });
+// Auto-calculate the other token amount to maintain pool ratio.
+let liqUpdating = false;
+document.getElementById('liq-solen').addEventListener('input', () => {
+  if (liqUpdating) return;
+  liqUpdating = true;
+  const solenVal = parseFloat(document.getElementById('liq-solen').value);
+  if (solenVal > 0 && poolData.reserveSolen > 0n && poolData.reserveStt > 0n) {
+    const ratio = Number(poolData.reserveStt) / Number(poolData.reserveSolen);
+    document.getElementById('liq-stt').value = (solenVal * ratio).toFixed(8);
+  }
+  updateLiqButton();
+  liqUpdating = false;
 });
+
+document.getElementById('liq-stt').addEventListener('input', () => {
+  if (liqUpdating) return;
+  liqUpdating = true;
+  const sttVal = parseFloat(document.getElementById('liq-stt').value);
+  if (sttVal > 0 && poolData.reserveSolen > 0n && poolData.reserveStt > 0n) {
+    const ratio = Number(poolData.reserveSolen) / Number(poolData.reserveStt);
+    document.getElementById('liq-solen').value = (sttVal * ratio).toFixed(8);
+  }
+  updateLiqButton();
+  liqUpdating = false;
+});
+
+function updateLiqButton() {
+  const s = parseFloat(document.getElementById('liq-solen').value);
+  const t = parseFloat(document.getElementById('liq-stt').value);
+  document.getElementById('liq-add-btn').disabled = !wallet || !s || !t || s <= 0 || t <= 0;
+}
 
 document.getElementById('liq-remove').addEventListener('input', () => {
   const v = parseFloat(document.getElementById('liq-remove').value);
