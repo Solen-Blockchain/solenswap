@@ -4,7 +4,7 @@
 const CONFIG = {
   rpc: 'https://testnet-rpc3.solenchain.io',
   chainId: 9000,
-  dexContract: 'b53a7508701336a8a6b877cd5f5e810169d9122bc0fc6ba6c9d93938c6d32b4a',
+  dexContract: '05dd670cca391e8564ba02b2fa817b4ac86b69e1714ef7d1035d8587dc16dcf4',
   sttContract: 'Dse2ppCqGpFrrUpuKFuXtSVQiBq8mvLF2cU8npQWicmp',
   decimals: 8,
 };
@@ -369,22 +369,24 @@ document.getElementById('swap-btn').addEventListener('click', async () => {
   showStatus('swap-status', 'Signing transaction...', '');
   try {
     if (swapDirection === 0) {
-      // SOLEN -> STT: Transfer SOLEN to DEX + deposit + swap (output stays in DEX balance)
+      // SOLEN -> STT: Transfer + deposit + swap + withdraw STT to wallet
       await wallet.provider.signAndSubmit({
         actions: [
           { type: 'transfer', to: dexBase58, amount: amountStr },
           { type: 'call', target: dexBase58, method: 'deposit_solen', args: amountHex },
           { type: 'call', target: dexBase58, method: 'swap_solen_for_stt', args: amountHex },
+          { type: 'call', target: dexBase58, method: 'withdraw_all_stt', args: '' },
         ]
       });
     } else {
-      // STT -> SOLEN: Transfer STT via token contract + deposit + swap
+      // STT -> SOLEN: Transfer STT + deposit + swap + withdraw SOLEN to wallet
       const transferArgs = CONFIG.dexContract + amountHex;
       await wallet.provider.signAndSubmit({
         actions: [
           { type: 'call', target: CONFIG.sttContract, method: 'transfer', args: transferArgs },
           { type: 'call', target: dexBase58, method: 'deposit_stt', args: amountHex },
           { type: 'call', target: dexBase58, method: 'swap_stt_for_solen', args: amountHex },
+          { type: 'call', target: dexBase58, method: 'withdraw_all_solen', args: '' },
         ]
       });
     }
@@ -443,12 +445,12 @@ document.getElementById('liq-remove-btn').addEventListener('click', async () => 
 
   showStatus('liq-status', 'Signing remove liquidity...', '');
   try {
-    // Atomic: remove liquidity + withdraw both tokens back to wallet.
+    // Atomic: remove liquidity + withdraw all tokens back to wallet.
     await wallet.provider.signAndSubmit({
       actions: [
         { type: 'call', target: dexBase58, method: 'remove_liquidity', args: u128ToLeHex(lpAmt) },
-        { type: 'call', target: dexBase58, method: 'withdraw_solen', args: u128ToLeHex(solenOut) },
-        { type: 'call', target: dexBase58, method: 'withdraw_stt', args: u128ToLeHex(sttOut) },
+        { type: 'call', target: dexBase58, method: 'withdraw_all_solen', args: '' },
+        { type: 'call', target: dexBase58, method: 'withdraw_all_stt', args: '' },
       ]
     });
     document.getElementById('liq-remove').value = '';

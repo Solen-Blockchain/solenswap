@@ -147,6 +147,8 @@ pub extern "C" fn call(input_ptr: i32, input_len: i32) -> i32 {
         b"deposit_stt" => do_deposit_stt(args),
         b"withdraw_solen" => do_withdraw_solen(args),
         b"withdraw_stt" => do_withdraw_stt(args),
+        b"withdraw_all_solen" => do_withdraw_all_solen(),
+        b"withdraw_all_stt" => do_withdraw_all_stt(),
         b"add_liquidity" => do_add_liquidity(args),
         b"remove_liquidity" => do_remove_liquidity(args),
         b"swap_solen_for_stt" => do_swap_solen_for_stt(args),
@@ -316,6 +318,53 @@ fn do_withdraw_stt(args: &[u8]) -> i32 {
     event_data[33..49].copy_from_slice(&amount.to_le_bytes());
     events::emit(b"withdraw", &event_data);
     sdk::return_value(b"ok")
+}
+
+/// Withdraw all SOLEN from the caller's internal balance.
+fn do_withdraw_all_solen() -> i32 {
+    let caller = sdk::caller();
+    let key = solen_balance_key(&caller);
+    let balance = get_u128(&key);
+    if balance == 0 { return sdk::return_value(b"ok"); }
+
+    set_u128(&key, 0);
+    if !sdk::transfer(&caller, balance) {
+        set_u128(&key, balance);
+        return sdk::return_value(b"err:transfer_failed");
+    }
+
+    let mut event_data = [0u8; 49];
+    event_data[0] = 0;
+    event_data[1..33].copy_from_slice(&caller);
+    event_data[33..49].copy_from_slice(&balance.to_le_bytes());
+    events::emit(b"withdraw", &event_data);
+    sdk::return_value(&balance.to_le_bytes())
+}
+
+/// Withdraw all STT from the caller's internal balance.
+fn do_withdraw_all_stt() -> i32 {
+    let caller = sdk::caller();
+    let key = stt_balance_key(&caller);
+    let balance = get_u128(&key);
+    if balance == 0 { return sdk::return_value(b"ok"); }
+
+    set_u128(&key, 0);
+
+    let claim_key = {
+        let mut k = [0u8; 38];
+        k[..6].copy_from_slice(b"claim/");
+        k[6..].copy_from_slice(&caller);
+        k
+    };
+    let pending = get_u128(&claim_key);
+    set_u128(&claim_key, pending.saturating_add(balance));
+
+    let mut event_data = [0u8; 49];
+    event_data[0] = 1;
+    event_data[1..33].copy_from_slice(&caller);
+    event_data[33..49].copy_from_slice(&balance.to_le_bytes());
+    events::emit(b"withdraw", &event_data);
+    sdk::return_value(&balance.to_le_bytes())
 }
 
 /// Add liquidity to the pool. Both SOLEN and STT amounts are taken from
