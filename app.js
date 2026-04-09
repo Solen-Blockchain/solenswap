@@ -233,13 +233,22 @@ async function loadBalances() {
 
 async function waitForConfirmation(statusEl, successMsg) {
   showStatus(statusEl, 'Transaction submitted. Waiting for confirmation...', '');
-  for (let i = 0; i < 10; i++) {
+  const oldReserveSolen = poolData.reserveSolen;
+  const oldReserveStt = poolData.reserveStt;
+  const oldLp = poolData.totalLp;
+
+  for (let i = 0; i < 15; i++) {
     await new Promise(r => setTimeout(r, 2000));
-    showStatus(statusEl, `Confirming... (${i + 1}/10)`, '');
+    await loadPoolData();
+    await loadBalances();
+    // Check if pool state changed.
+    if (poolData.reserveSolen !== oldReserveSolen || poolData.reserveStt !== oldReserveStt || poolData.totalLp !== oldLp) {
+      showStatus(statusEl, successMsg, 'success');
+      return;
+    }
+    showStatus(statusEl, `Confirming... (${i + 1}/15)`, '');
   }
-  showStatus(statusEl, successMsg, 'success');
-  loadPoolData();
-  loadBalances();
+  showStatus(statusEl, 'Transaction may have failed. Check the explorer.', 'error');
 }
 
 function showStatus(elId, msg, type) {
